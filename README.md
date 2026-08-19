@@ -19,7 +19,7 @@ AWS/EKS - the assignment permits AWS in place of GCP.
 - [`ansible/`](ansible/) - installs Python 3.9, clones the repo to `/srv/data-sync`,
   builds a venv, manages a systemd unit
 - Gated to hosts where `be_role == 'service'`; `install` and `deploy` tags
-- Details → [ansible/roles/be-data-sync/README.md](ansible/roles/be-data-sync/README.md)
+- Details → [ansible/README.md](ansible/README.md)
 
 ## Part 3 - Design answers
 
