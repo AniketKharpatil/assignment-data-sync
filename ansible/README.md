@@ -15,7 +15,7 @@ roles/be-data-sync/                defaults, tasks, handlers, templates, meta
 
 ## Usage
 
-Run from `ansible/` — `ansible.cfg` there sets the inventory and roles path.
+Run from `ansible/` - `ansible.cfg` there sets the inventory and roles path.
 
 ```bash
 ansible-playbook playbooks/playbook-data-sync.yml                 # full run
@@ -47,14 +47,14 @@ ansible-vault create group_vars/service/vault.yml   # data_sync_redis_password: 
 ansible-playbook playbooks/playbook-data-sync.yml --ask-vault-pass
 ```
 
-Delivered via `EnvironmentFile` (`0640 root:data-sync`), not an `Environment=` line —
+Delivered via `EnvironmentFile` (`0640 root:data-sync`), not an `Environment=` line -
 unit files are world-readable.
 
 ## Notes
 
 - **One `be_role` gate** in `tasks/main.yml` wraps both includes, so it applies to
   new tasks automatically.
-- **`dnf`, not `yum`** — on Rocky 8 `yum` is a symlink to dnf, and Ansible's `yum`
+- **`dnf`, not `yum`** - on Rocky 8 `yum` is a symlink to dnf, and Ansible's `yum`
   module is deprecated (`ansible-lint` fails on it).
 
 ## Verified
