@@ -1,0 +1,111 @@
+# data-sync - PRODUCTION. HPA 3-20, strict limits, production AWS Redis.
+# Sized for ~50M req/day with 2,000 req/s bursts.
+#
+#   helm upgrade --install data-sync helm/charts/data-sync \
+#     --namespace data-sync --create-namespace \
+#     -f helm/charts/data-sync/values.yaml \
+#     -f helm/charts/data-sync/values.production.yaml
+
+replicaCount: 3
+
+image:
+  tag: "1.0.0"       
+  pullPolicy: IfNotPresent
+
+app:
+  env: production
+  logLevel: INFO
+  workers: 4           
+  maxConnections: 100
+
+redis:
+  deployLocal: false
+  host: data-sync-prod.xyz789.ng.0001.aps1.cache.amazonaws.com   # ElastiCache dummy url
+  port: 6379
+
+# Secret is owned by External Secrets Operator; Helm never sees the credential.
+secret:
+  existingSecret: data-sync-redis
+  key: REDIS_PASSWORD
+
+resources:
+  requests:
+    cpu: 1000m
+    memory: 1Gi
+  limits:
+    cpu: 2000m
+    memory: 1Gi
+
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 20
+  targetCPUUtilizationPercentage: 60  
+  targetMemoryUtilizationPercentage: null
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 0     
+      policies:
+        - type: Percent                # double every 15s...
+          value: 100
+          periodSeconds: 15
+        - type: Pods                   
+          value: 4
+          periodSeconds: 15
+      selectPolicy: Max
+    scaleDown:
+      stabilizationWindowSeconds: 600  
+      policies:
+        - type: Percent
+          value: 25
+          periodSeconds: 120
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+serviceMonitor:
+  enabled: true
+  interval: 30s
+  scrapeTimeout: 10s
+  labels:
+    release: kube-prometheus-stack
+
+strategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxSurge: 25%
+    maxUnavailable: 0   # keep full capacity during a deploy
+
+# Hard zone spread: 3 replicas across 3 AZs is the availability baseline. Soft node spread so
+# one node loss cannot take an AZ's whole share. The Kustomize overlay patches
+# this same field and is authoritative for the production cluster.
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: topology.kubernetes.io/zone
+    whenUnsatisfiable: DoNotSchedule
+    labelSelector:
+      matchLabels:
+        app.kubernetes.io/name: data-sync
+        app.kubernetes.io/instance: data-sync
+  - maxSkew: 1
+    topologyKey: kubernetes.io/hostname
+    whenUnsatisfiable: ScheduleAnyway
+    labelSelector:
+      matchLabels:
+        app.kubernetes.io/name: data-sync
+        app.kubernetes.io/instance: data-sync
+
+# Must already exist in the cluster; an unknown class rejects the pod.
+priorityClassName: platform-high
+
+# Noisy-neighbour fix: data-sync is the only workload that both targets this pool and tolerates its taint
+nodeSelector:
+  workload: data-sync
+tolerations:
+  - key: dedicated
+    operator: Equal
+    value: data-sync
+    effect: NoSchedule
+commonLabels:
+  environment: production

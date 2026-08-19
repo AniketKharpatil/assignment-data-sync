@@ -1,0 +1,46 @@
+# Helm
+**/charts/*.tgz
+**/Chart.lock
+
+# Kustomize generated
+standard/**/base/manifests.yaml
+
+# Ansible
+**/__pycache__/
+**/*.pyc
+**/.ansible/
+**/ansible.log
+**/*.retry
+**/inventory/**/host_vars/
+**/inventory/**/group_vars/
+
+
+# IDE
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
+# Secrets
+*.secret.yaml
+*.secret.yml
+*.pem
+*.key
+*.vault
+
+# Local overrides
+values.local.yaml
+*.local.yaml
+local.yml
+
+# Python
+__pycache__/
+*.pyc
+venv/
+.env
+.pytest_cache/
+
+# Temp
+tmp/
+*.log
+*.tmp

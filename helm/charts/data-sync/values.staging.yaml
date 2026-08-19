@@ -1,0 +1,62 @@
+# data-sync - STAGING. 2 replicas, INFO logs, staging Redis.
+#
+#   helm upgrade --install data-sync helm/charts/data-sync \
+#     --namespace data-sync-staging --create-namespace \
+#     -f helm/charts/data-sync/values.yaml \
+#     -f helm/charts/data-sync/values.staging.yaml
+replicaCount: 2
+
+image:
+  tag: "1.0.0"
+  pullPolicy: IfNotPresent   
+
+app:
+  env: staging
+  logLevel: INFO
+  workers: 4
+  maxConnections: 100
+
+redis:
+  deployLocal: false
+  host: data-sync-staging.abc123.ng.0001.aps1.cache.amazonaws.com   # ElastiCache
+  port: 6379
+
+# Secret is created outside Helm by External Secrets Operator (AWS Secrets Manager).
+secret:
+  existingSecret: data-sync-redis
+  key: REDIS_PASSWORD
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 256Mi
+  limits:
+    memory: 512Mi   # kept no CPU limit: throttling hurts latency more than brief bursting
+
+autoscaling:
+  enabled: false
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+serviceMonitor:
+  enabled: true
+  interval: 30s
+  labels:
+    release: kube-prometheus-stack
+
+# ScheduleAnyway, not DoNotSchedule: a small staging cluster may lack a spare AZ
+# and a hard constraint would leave the pod Pending. The instance label keeps the
+# selector scoped to this release.
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: topology.kubernetes.io/zone
+    whenUnsatisfiable: ScheduleAnyway
+    labelSelector:
+      matchLabels:
+        app.kubernetes.io/name: data-sync
+        app.kubernetes.io/instance: data-sync   # must match the release name
+
+commonLabels:
+  environment: staging

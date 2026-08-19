@@ -1,0 +1,20 @@
+{{/*
+Non-sensitive configuration. Consumed with envFrom in the Deployment, so
+adding a key here adds an env var without touching the Deployment template.
+
+Every value is quoted: ConfigMap data values must be strings, and unquoted
+numbers/booleans are a YAML type error at apply time.
+*/}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "data-sync.fullname" . }}
+  labels:
+    {{- include "data-sync.labels" . | nindent 4 }}
+data:
+  APP_ENV: {{ .Values.app.env | quote }}
+  LOG_LEVEL: {{ .Values.app.logLevel | quote }}
+  WORKERS: {{ .Values.app.workers | quote }}
+  MAX_CONNECTIONS: {{ .Values.app.maxConnections | quote }}
+  REDIS_HOST: {{ .Values.redis.host | quote }}
+  REDIS_PORT: {{ .Values.redis.port | quote }}

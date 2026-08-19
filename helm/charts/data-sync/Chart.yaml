@@ -1,0 +1,26 @@
+apiVersion: v2
+name: data-sync
+description: Python FastAPI service that syncs SEO analytics data, backed by Redis.
+type: application
+
+version: 0.1.0
+appVersion: "1.0.0"
+
+keywords:
+  - fastapi
+  - data-sync
+  - seo-analytics
+
+maintainers:
+  - name: Platform Team
+    email: platform@example.com
+
+# Redis is an OPTIONAL dependency for local/dev use only. 
+# It is disabled by default: staging and production point at managed Redis(ElastiCache) via redis.host in the per-environment values files.
+# Version is pinned (not a "^28.0.0" range) so `helm dependency build` is
+# reproducible - a range would silently pull a different sub-chart over time.
+dependencies:
+  - name: redis
+    version: "28.0.7"
+    repository: "https://charts.bitnami.com/bitnami"
+    condition: redis.deployLocal

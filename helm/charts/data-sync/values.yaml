@@ -1,0 +1,162 @@
+# data-sync - default values
+# Pods when autoscaling is off; ignored when autoscaling.enabled=true.
+replicaCount: 1
+
+image:
+  repository: ghcr.io/example/data-sync
+  tag: ""            # defaults to .Chart.AppVersion when empty
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+nameOverride: ""
+fullnameOverride: ""
+
+automountServiceAccountToken: false
+
+# Non-sensitive config added to ConfigMap and consumed via envFrom.
+app:
+  env: dev            # APP_ENV: staging | production
+  logLevel: DEBUG     # LOG_LEVEL: INFO | DEBUG
+  workers: 2          # WORKERS: uvicorn processes; keep aligned with the CPU request
+  maxConnections: 50  # MAX_CONNECTIONS: Redis pool per pod; x maxReplicas must stay under Redis maxclients
+  port: 8080          # container port
+  extraEnv: []        # e.g. [{name: FEATURE_X, value: "1"}]
+
+# data-sync reads deployLocal/host/port; the Bitnami sub-chart reads the rest.
+redis:
+  deployLocal: false  #gates the Chart.yaml dependency
+  host: redis-master.data-sync.svc.cluster.local   # REDIS_HOST
+  port: 6379          # REDIS_PORT
+
+  # Bitnami sub-chart values: single node, no persistence, not production-grade.
+  architecture: standalone
+  auth:
+    enabled: true
+    existingSecret: ""    # point at the same Secret data-sync uses
+    existingSecretPasswordKey: REDIS_PASSWORD
+  master:
+    persistence:
+      enabled: false
+
+# REDIS_PASSWORD. existingSecret set -> chart renders nothing and just reads it
+# (production path). Empty -> chart renders a Secret from `password`, which
+# lands in Helm release state, so local use only.
+secret:
+  existingSecret: ""
+  key: REDIS_PASSWORD
+  password: "changeme"
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: http    # named port, so the ServiceMonitor is not tied to a number
+  annotations: {}
+
+# No CPU limit by default. Memory limit stays. production sets both.
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    memory: 256Mi
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 3
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: null   # omitted from the HPA when null
+  # scaleUp 0s reacts immediately (default is 300s); scaleDown stays slow to avoid flapping.
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 15
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Percent
+          value: 50
+          periodSeconds: 60
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1       # per task spec; see README for why maxUnavailable is safer at 3+ replicas
+  maxUnavailable: null  # takes precedence over minAvailable when set
+
+# All three hit /health. readiness is fast and strict, liveness slow and
+# forgiving, startup covers a slow boot (~30s) before liveness begins.
+probes:
+  readiness:
+    enabled: true
+    path: /health
+    initialDelaySeconds: 5
+    periodSeconds: 5
+    timeoutSeconds: 2
+    failureThreshold: 3
+    successThreshold: 1
+  liveness:
+    enabled: true
+    path: /health
+    initialDelaySeconds: 15
+    periodSeconds: 20
+    timeoutSeconds: 3
+    failureThreshold: 6
+    successThreshold: 1
+  startup:
+    enabled: true
+    path: /health
+    periodSeconds: 3
+    timeoutSeconds: 2
+    failureThreshold: 10
+
+serviceMonitor:
+  enabled: false      
+  requireCRD: false
+  labels:
+    release: kube-prometheus-stack   # discovery label kube-prometheus-stack selects on
+  path: /metrics
+  interval: 30s
+  scrapeTimeout: 10s
+
+metrics:
+  path: /metrics      # served on the same port as the API
+
+strategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxSurge: 25%
+    maxUnavailable: 0     # never dip below the current replica count
+
+terminationGracePeriodSeconds: 30
+# preStop sleep so endpoints deregister before the process stops accepting connections.
+preStopSleepSeconds: 5
+topologySpreadConstraints: []
+priorityClassName: ""   # leave empty unless the cluster defines classes
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  runAsGroup: 10001
+  fsGroup: 10001
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true   # /tmp is mounted writable by the Deployment
+  capabilities:
+    drop: ["ALL"]
+
+extraVolumes: []
+extraVolumeMounts: []
+
+podAnnotations: {}
+podLabels: {}
+commonLabels: {}
