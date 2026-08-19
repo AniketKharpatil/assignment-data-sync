@@ -1,0 +1,18 @@
+---
+galaxy_info:
+  role_name: be_data_sync
+  namespace: platform
+  author: Platform Team
+  description: Deploys the data-sync FastAPI service to CentOS/Rocky 8 VMs.
+  license: MIT
+  min_ansible_version: "2.14"
+  platforms:
+    - name: EL
+      versions:
+        - "8"
+  galaxy_tags:
+    - python
+    - fastapi
+    - systemd
+
+dependencies: []

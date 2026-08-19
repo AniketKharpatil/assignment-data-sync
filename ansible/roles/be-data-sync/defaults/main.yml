@@ -1,0 +1,47 @@
+---
+# Defaults for be-data-sync. Override in group_vars/service.yml or host_vars.
+
+# --- Identity -----------------------------------------------------------------
+data_sync_service_name: data-sync
+data_sync_user: data-sync            # service account; created by the role
+data_sync_group: data-sync
+
+# --- Paths --------------------------------------------------------------------
+data_sync_root: /srv/data-sync
+data_sync_venv: "{{ data_sync_root }}/venv"
+data_sync_env_file: /etc/data-sync/data-sync.env
+
+# --- Source repo --------------------------------------------------------------
+data_sync_repo_url: https://github.com/AniketKharpatil/assignment-data-sync
+data_sync_repo_version: v1.0.0
+data_sync_requirements_file: requirements.txt
+
+# --- Python -------------------------------------------------------------------
+# Rocky/CentOS 8 ships 3.9 as the `python39` package set (AppStream).
+data_sync_python_packages:
+  - python39
+  - python39-pip
+  - python39-devel     # needed to build wheels for C-backed deps
+  - git
+data_sync_python_interpreter: /usr/bin/python3.9
+
+# --- Application config (rendered into the systemd EnvironmentFile) -----------
+data_sync_app_env: production        # APP_ENV
+data_sync_log_level: INFO            # LOG_LEVEL
+data_sync_redis_host: localhost      # REDIS_HOST
+data_sync_redis_port: 6379
+data_sync_workers: 4
+data_sync_max_connections: 100
+data_sync_bind_host: 0.0.0.0         # noqa: yaml[truthy] - an IP, not a boolean
+data_sync_bind_port: 8080
+
+# REDIS_PASSWORD must come from ansible-vault, never a plaintext group_vars file.
+data_sync_redis_password: ""
+
+# --- Service behaviour --------------------------------------------------------
+data_sync_service_state: started
+data_sync_service_enabled: true
+data_sync_restart_sec: 5
+
+# Gate: the role only acts on hosts whose inventory sets be_role == 'service'.
+data_sync_required_be_role: service

@@ -1,0 +1,29 @@
+---
+# Entry point. The be_role gate lives here, wrapping both includes
+# Trade-off: a skipped host reports one skip rather than N, which makes output
+# quieter but slightly less granular.
+
+- name: Verify the host is a service node
+  ansible.builtin.debug:
+    msg: >-
+      Skipping be-data-sync: be_role is
+      '{{ be_role | default("undefined") }}',
+      expected '{{ data_sync_required_be_role }}'.
+  when: be_role | default('') != data_sync_required_be_role
+  tags:
+    - always
+
+- name: Configure the data-sync service
+  when: be_role | default('') == data_sync_required_be_role
+  block:
+    - name: Install packages, source, and virtualenv
+      ansible.builtin.include_tasks:
+        file: install.yml
+      tags:
+        - install
+
+    - name: Deploy configuration and manage the service
+      ansible.builtin.include_tasks:
+        file: deploy.yml
+      tags:
+        - deploy

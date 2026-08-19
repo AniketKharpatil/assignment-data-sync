@@ -1,0 +1,16 @@
+---
+# Handler names are referenced verbatim by `notify:` in tasks/. Renaming one
+# without updating its notify silently stops the restart from happening.
+
+- name: Reload systemd
+  ansible.builtin.systemd_service:
+    daemon_reload: true
+  become: true
+
+- name: Restart data-sync
+  ansible.builtin.systemd_service:
+    name: "{{ data_sync_service_name }}"
+    state: restarted
+  become: true
+  # Only restart something that is supposed to be running
+  when: data_sync_service_state == 'started'

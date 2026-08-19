@@ -2,9 +2,6 @@
 **/charts/*.tgz
 **/Chart.lock
 
-# Kustomize generated
-standard/**/base/manifests.yaml
-
 # Ansible
 **/__pycache__/
 **/*.pyc
@@ -13,7 +10,6 @@ standard/**/base/manifests.yaml
 **/*.retry
 **/inventory/**/host_vars/
 **/inventory/**/group_vars/
-
 
 # IDE
 .idea/

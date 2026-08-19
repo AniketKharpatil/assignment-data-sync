@@ -1,0 +1,21 @@
+---
+# Group variables for the `service` group. These override roles/be-data-sync/defaults.
+#
+# Auto-loaded because this directory sits beside the inventory named in
+# ansible.cfg. Moving it elsewhere makes the variables silently not load.
+
+data_sync_app_env: production
+data_sync_redis_host: redis-master.internal.example.com
+data_sync_log_level: INFO
+
+# REDIS_PASSWORD is deliberately absent here - a plaintext credential in a
+# committed group_vars file is the thing to avoid. Supply it from an encrypted
+# file instead:
+#
+#   ansible-vault create group_vars/service/vault.yml
+#   # then inside:  data_sync_redis_password: <secret>
+#
+# Ansible loads group_vars/service.yml and every file under group_vars/service/
+# and merges them, so the vault file can be added alongside this one without
+# moving anything. Verified with `ansible-inventory --host`.
+# See roles/be-data-sync/README.md.

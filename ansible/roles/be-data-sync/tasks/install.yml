@@ -1,0 +1,62 @@
+---
+# Tag: install. Packages, service account, source checkout, virtualenv.
+
+# As per the assignment "via yum" , so this is the
+# same package manager, named the way current Ansible expects.
+- name: Install Python 3.9, pip, and git
+  ansible.builtin.dnf:
+    name: "{{ data_sync_python_packages }}"
+    state: present
+  become: true
+
+- name: Create the service group
+  ansible.builtin.group:
+    name: "{{ data_sync_group }}"
+    system: true
+    state: present
+  become: true
+
+# A dedicated non-root account. Not in the task list, but running a network
+# service as root is avoidable; documented as an addition in the role README.
+- name: Create the service user
+  ansible.builtin.user:
+    name: "{{ data_sync_user }}"
+    group: "{{ data_sync_group }}"
+    home: "{{ data_sync_root }}"
+    shell: /sbin/nologin
+    system: true
+    create_home: false
+    state: present
+  become: true
+
+- name: Create the application directory
+  ansible.builtin.file:
+    path: "{{ data_sync_root }}"
+    state: directory
+    owner: "{{ data_sync_user }}"
+    group: "{{ data_sync_group }}"
+    mode: "0755"
+  become: true
+
+# The git module is idempotent: it clones when absent and fetches/checks out
+# when the target version differs.
+- name: Clone or update the data-sync repository
+  ansible.builtin.git:
+    repo: "{{ data_sync_repo_url }}"
+    dest: "{{ data_sync_root }}/src"
+    version: "{{ data_sync_repo_version }}"
+    depth: 1
+    force: true
+  become: true
+  become_user: "{{ data_sync_user }}"
+  notify: Restart data-sync
+
+- name: Create the virtualenv and install dependencies
+  ansible.builtin.pip:
+    requirements: "{{ data_sync_root }}/src/{{ data_sync_requirements_file }}"
+    virtualenv: "{{ data_sync_venv }}"
+    virtualenv_command: "{{ data_sync_python_interpreter }} -m venv"
+    state: present
+  become: true
+  become_user: "{{ data_sync_user }}"
+  notify: Restart data-sync

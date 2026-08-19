@@ -1,0 +1,18 @@
+---
+# Deploy data-sync to the `service` group.
+#
+#   ansible-playbook playbooks/playbook-data-sync.yml                 # full run
+#   ansible-playbook playbooks/playbook-data-sync.yml --tags install  # packages, repo, venv
+#   ansible-playbook playbooks/playbook-data-sync.yml --tags deploy   # config + service only
+#   ansible-playbook playbooks/playbook-data-sync.yml --check --diff  # dry run
+#
+# Run from the `ansible/` directory: ansible.cfg there sets the inventory and
+# roles_path, which is also what makes group_vars/service.yml load.
+
+- name: Deploy data-sync to service nodes
+  hosts: service
+  become: false           # individual tasks escalate; the play does not run as root
+  gather_facts: true      # needed for the package manager and systemd facts
+
+  roles:
+    - role: be-data-sync

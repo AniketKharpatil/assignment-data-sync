@@ -1,0 +1,54 @@
+---
+# Tag: deploy. Environment file, systemd unit, service state.
+# Runs without the install tag so a config-only change skips package work.
+
+- name: Fail early when the Redis password is unset
+  ansible.builtin.assert:
+    that:
+      - data_sync_redis_password | length > 0
+    fail_msg: >-
+      data_sync_redis_password is empty. Supply it from ansible-vault
+      (see roles/be-data-sync/README.md); the service will not authenticate
+      to Redis without it.
+    quiet: true
+
+- name: Create the configuration directory
+  ansible.builtin.file:
+    path: "{{ data_sync_env_file | dirname }}"
+    state: directory
+    owner: root
+    group: "{{ data_sync_group }}"
+    mode: "0750"
+  become: true
+
+# Secrets go in an EnvironmentFile
+- name: Deploy the environment file
+  ansible.builtin.template:
+    src: data-sync.env.j2
+    dest: "{{ data_sync_env_file }}"
+    owner: root
+    group: "{{ data_sync_group }}"
+    mode: "0640"
+  become: true
+  no_log: true          # the rendered diff would contain the password
+  notify: Restart data-sync
+
+- name: Deploy the systemd unit file
+  ansible.builtin.template:
+    src: data-sync.service.j2
+    dest: "/etc/systemd/system/{{ data_sync_service_name }}.service"
+    owner: root
+    group: root
+    mode: "0644"
+  become: true
+  notify:
+    - Reload systemd
+    - Restart data-sync
+
+- name: Ensure the service is enabled and running
+  ansible.builtin.systemd_service:
+    name: "{{ data_sync_service_name }}"
+    state: "{{ data_sync_service_state }}"
+    enabled: "{{ data_sync_service_enabled }}"
+    daemon_reload: true
+  become: true
