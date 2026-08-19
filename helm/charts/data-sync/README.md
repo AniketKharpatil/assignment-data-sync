@@ -174,3 +174,79 @@ curl -fsS localhost:8080/health   # {"status":"ok"}
 `redis.deployLocal=true` brings up the Bitnami Redis sub-chart so there is
 something to connect to. The default `values.yaml` points at
 `redis-master.data-sync.svc.cluster.local`, which is the sub-chart's service name.
+
+---
+
+## Design notes and trade-offs
+
+### Secret handling
+
+`REDIS_PASSWORD` is delivered in one of two modes:
+
+- **`secret.existingSecret` set** (staging/production) : chart references only, no Secret rendered. Credential owned by External Secrets Operator, never in repo or Helm state.
+- **`secret.existingSecret` empty** (local) : renders Secret from `secret.password`. Convenient for kind, unacceptable for production.
+
+**Key choices:**
+- `secretKeyRef` not `envFrom` : prevents any future Secret key from silently becoming a container env var.
+- No Secret checksum in chart : password changes shouldn't force a full rollout. Handled explicitly via `SECRET_CHECKSUM` in Kustomize overlay.
+
+### CPU limits
+
+No CPU limit in dev/staging : CFS quota throttling causes p99 latency spikes. Production sets `cpu: 2000m` (2× headroom over request) to satisfy "strict limits" requirement while minimizing throttling.
+
+### PodDisruptionBudget
+
+`minAvailable: 1` per spec. Trade-off: with 3 replicas, a drain can evict 2 pods at once. `maxUnavailable: 1` is safer for production. Chart supports both; spec requirement kept.
+
+### Probes
+
+Both hit `/health` but tuned differently:
+- **readiness**: fast (5s/3 failures) : remove from service immediately
+- **liveness**: slow (20s/6 failures) : avoid restart storms on transient issues
+- **startup**: 30s grace period
+
+
+if `/health` checks Redis, a Redis blip fails all pods at once. Better: shallow `/health` + dependency-aware `/ready`.
+
+### Replicas under HPA
+
+Omitted when HPA enabled, otherwise Helm and HPA fight on every upgrade, causing pod churn.
+
+### ServiceMonitor
+
+`release: kube-prometheus-stack` label is the discovery contract; without it, the object applies but is never scraped. `requireCRD` defaults to `false` because `helm template` can't check cluster state.
+
+### Shortcuts taken
+
+- **Bitnami Redis sub-chart** : declared as an optional dependency, disabled by
+  default, single node, no persistence, for local smoke tests only. Staging and
+  production use managed Redis (ElastiCache). Even so, `helm dependency build`
+  must run once before templating, which is the cost of declaring it at all.
+
+- **Example Redis hostnames** in the environment values files are illustrative
+  ElastiCache endpoints, not real.
+- **No Ingress** : the task specifies ClusterIP. Traffic is assumed to arrive via
+  an existing gateway or mesh.
+- **No NetworkPolicy** : out of scope for the task, and would be the next thing I
+  added: default-deny egress with an allowance for Redis and DNS.
+
+---
+## Kustomize overlay
+
+`standard/data-sync/production/` layers cluster-specific concerns on top of the
+chart. See its `kustomization.yaml` for the full rationale; in short:
+
+```bash
+kubectl kustomize standard/data-sync/production
+```
+
+It consumes `helm template` output committed at `base/manifests.yaml`, and adds:
+
+- **`patch-topology-spread.yaml`** : spreads pods across AWS AZs (hard) and nodes
+  (soft).
+- **`patch-secret-checksum.yaml`** : a `SECRET_CHECKSUM` pod-template annotation
+  so a Redis password rotation triggers a normal rolling update.
+
+
+Note that the two layers overlap on `topologySpreadConstraints`: the chart sets it
+for production and the overlay patches the same field.
