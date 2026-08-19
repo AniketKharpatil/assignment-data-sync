@@ -1,11 +1,8 @@
 ---
 # ansible-lint configuration.
 #
-# Without this, ansible-lint resolves roles relative to the playbook directory
-# (ansible/playbooks/roles) and cannot find roles/be-data-sync. Pointing it at
-# the tree root fixes role discovery independently of ansible.cfg, which is
-# ignored outright when the checkout sits on a world-writable mount - as it does
-# under WSL on /mnt/c.
+# Role discovery: ansible-lint resolves roles relative to the playbook directory
+# (ansible/playbooks/roles) by default. This config points to the tree root.
 profile: production
 
 exclude_paths:
