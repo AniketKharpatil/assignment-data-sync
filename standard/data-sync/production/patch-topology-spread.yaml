@@ -1,0 +1,32 @@
+# Spread pods across AWS AZs using topology.kubernetes.io/zone.
+#
+# This replaces (not appends) the chart's constraints since topologySpreadConstraints
+# has no merge key - this file is the authoritative placement definition.
+#
+#   zone / DoNotSchedule  - hard requirement. Three replicas must occupy three
+#                           AZs; a pod that cannot stays Pending and alerts,
+#                           rather than silently collapsing the AZ guarantee.
+#   hostname / ScheduleAnyway - best-effort node spread inside each AZ, so one
+#                           node loss cannot remove an AZ's whole share.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: data-sync
+spec:
+  template:
+    spec:
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: data-sync
+              app.kubernetes.io/instance: data-sync
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: data-sync
+              app.kubernetes.io/instance: data-sync
